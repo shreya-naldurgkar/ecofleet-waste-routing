@@ -1,0 +1,14 @@
+target/
+data/
+dependency-reduced-pom.xml
+*.class
+.env
+
+.DS_Store
+
+.vscode/
+
+.idea/
+*.iml
+
+.envinstall_member3_phase*.sh

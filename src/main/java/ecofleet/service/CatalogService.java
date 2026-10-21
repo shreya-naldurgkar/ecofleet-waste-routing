@@ -1,0 +1,63 @@
+package ecofleet.service;
+
+import ecofleet.dao.*;
+import ecofleet.db.Database;
+import ecofleet.model.*;
+import java.util.List;
+import java.util.Optional;
+import static ecofleet.db.DatabaseContract.*;
+
+public final class CatalogService {
+    private final Database database;
+    public CatalogService(Database database) { this.database = database; }
+
+    public List<Zone> zones(UserSession session) {
+        return database.read(c -> { Access.current(c, session); return new ZoneDAO(c).findAll(); });
+    }
+
+    /** Zone names are non-sensitive and are needed before a generator account exists. */
+    public List<Zone> registrationZones() {
+        return database.read(c -> new ZoneDAO(c).findAll());
+    }
+
+    public List<WasteCategory> categories(UserSession session) {
+        return database.read(c -> { Access.current(c, session); return new CategoryDAO(c).findAll(); });
+    }
+
+    public List<DisposalFacility> disposalFacilities(UserSession session) {
+        return database.read(c -> { Access.staff(c, session); return new DisposalFacilityDAO(c).findAll(); });
+    }
+
+    public Optional<DisposalFacility> disposalFacility(UserSession session, long facilityId) {
+        Validation.id(facilityId, "Disposal facility");
+        return database.read(c -> { Access.staff(c, session); return new DisposalFacilityDAO(c).findById(facilityId); });
+    }
+
+    public List<DisposalFacility> disposalFacilitiesByStatus(UserSession session, String status) {
+        Validation.text(status, "Disposal facility status");
+        return database.read(c -> { Access.staff(c, session); return new DisposalFacilityDAO(c).findByStatus(status); });
+    }
+
+    public long saveZone(UserSession session, Zone zone) {
+        Validation.require(zone != null, "Zone is required."); Validation.text(zone.getZoneName(), "Zone name");
+        return database.transaction(c -> {
+            Access.admin(c, session); ZoneDAO dao = new ZoneDAO(c);
+            if (zone.getZoneId() == null) return dao.insert(zone);
+            Validation.id(zone.getZoneId(), "Zone"); dao.update(zone); return zone.getZoneId();
+        });
+    }
+
+    public long saveCategory(UserSession session, WasteCategory category) {
+        Validation.require(category != null, "Category is required."); Validation.text(category.getCategoryName(), "Category name");
+        Validation.require(category.getHazardLevel() != null && HAZARD_LEVELS.contains(category.getHazardLevel()), "Unknown hazard level.");
+        return database.transaction(c -> {
+            Access.admin(c, session); CategoryDAO dao = new CategoryDAO(c);
+            if (category.getCategoryId() == null) return dao.insert(category);
+            Validation.id(category.getCategoryId(), "Category"); dao.update(category); return category.getCategoryId();
+        });
+    }
+
+    public void deleteUnreferencedCategory(UserSession session, long id) {
+        database.transaction(c -> { Access.admin(c, session); new CategoryDAO(c).delete(id); return null; });
+    }
+}
